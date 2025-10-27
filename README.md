@@ -2,7 +2,7 @@
 
 ## Introduction
 
-**Document Chunk-inizer**! This tool is experimental integration based on of both Docling for document parsing and Ollama for local models. It enables you to use Docling and Ollama for RAG over PDF files (or other supported file format) with LlamaIndex. It provides you a sleek clean Streamlit GUI to chat with your own documents locally.
+**Document Chunk-inizer**! This tool is an experimental integration based on of both Docling for document parsing and Ollama for local models. It enables you to use Docling and Ollama for RAG over PDF files (or other supported file format) with LlamaIndex. It provides you a sleek clean Streamlit GUI to chat with your own documents locally.
 
 ## Prerequisites
 
@@ -74,4 +74,9 @@ From left panel, upload your local PDF file, and start chatting with them.
 ## License
 
 This project is licensed under the APACHE 2.0 License - see the `LICENSE` file for details.
+
+### Snapshot demo
+<img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/docuchunkinizer.png">
+<img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/dochunk-backend.png">
+<img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/dochubk-ready.png">
 
