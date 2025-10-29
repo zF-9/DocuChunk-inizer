@@ -46,6 +46,8 @@ Before you begin, ensure you have met the following requirements:
 5. **Install the dependencies**:
 
     ```bash
+    pip install langchain_ollama langchain_docling angchain_text_splitters langchain_milvus langchain_huggingface
+
     pip install torch 
     pip install numpy 
     pip install streamlit 
@@ -75,8 +77,22 @@ From left panel, upload your local PDF file, and start chatting with them.
 
 This project is licensed under the APACHE 2.0 License - see the `LICENSE` file for details.
 
+
 ### Snapshot demo
 <img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/docuchunkinizer.png">
 <img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/dochunk-backend.png">
 <img src="https://github.com/zF-9/DocuChunk-inizer/blob/22605be5014105a5160dd22df22dcc4661daf6db/images/dochubk-ready.png">
+
+
+## changelog 
+change Native Vector DB (MongoDB) to Milvus-Lite vDB 
+```bash
+pip install pymilvus[milvus_lite]
+```
+Milvus-Lite Installation
+```bash
+sudo docker pull milvusdb/milvus:v2.6.4
+curl -sfL https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/standalone_embed.sh -o standalone_embed.sh
+bash standalone_embed.sh start
+```
 

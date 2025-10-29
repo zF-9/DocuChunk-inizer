@@ -7,7 +7,9 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_milvus import Milvus
 from langchain_huggingface import HuggingFaceEmbeddings
+from docling.document_converter import DocumentConverter
 import tempfile
+
 
 # Set environment variable to allow multiple copies of libomp.dylib
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -27,13 +29,14 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📚 Prototype = docling + Granite")
+st.title("📚 (Knowledge Based Chunk)-inizer = docling + Granite")
 st.markdown("Upload a PDF and ask questions about its content")
 
 # Sidebar for PDF upload and processing
 with st.sidebar:
     st.header("📄 Document Upload")
     uploaded_file = st.file_uploader("Choose a PDF file", type=['pdf'])
+    print(uploaded_file)
 
     if uploaded_file is not None:
         # Check if this is a new file
@@ -112,89 +115,100 @@ with st.sidebar:
             st.session_state.messages = []
             st.rerun()
 
-# Main chat interface
-if st.session_state.vector_store is None:
-    st.info("👈 Please upload a PDF file to get started")
-else:
-    # Display chat messages
-    for message in st.session_state.messages:
-        if isinstance(message, HumanMessage):
+tab1, tab2 = st.tabs(["CHAT", "DOCS"])
+
+with tab1:
+    # Main chat interface
+    if st.session_state.vector_store is None:
+        st.info("👈 Please upload a PDF file to get started")
+    else:
+        # Display chat messages
+        for message in st.session_state.messages:
+            if isinstance(message, HumanMessage):
+                with st.chat_message("user"):
+                    st.markdown(message.content)
+            elif isinstance(message, AIMessage):
+                with st.chat_message("assistant"):
+                    st.markdown(message.content)
+
+        # Chat input
+        if prompt := st.chat_input("Ask a question about your document"):
+            # Add user message to chat
+            user_message = HumanMessage(content=prompt)
+            st.session_state.messages.append(user_message)
+
             with st.chat_message("user"):
-                st.markdown(message.content)
-        elif isinstance(message, AIMessage):
+                st.markdown(prompt)
+
+            # Retrieve relevant documents
             with st.chat_message("assistant"):
-                st.markdown(message.content)
+                with st.spinner("Thinking..."):
+                    try:
+                        # Retrieve relevant context
+                        retriever = st.session_state.vector_store.as_retriever(
+                            search_type="similarity",
+                            search_kwargs={"k": 4}
+                        )
+                        relevant_docs = retriever.invoke(prompt)
 
-    # Chat input
-    if prompt := st.chat_input("Ask a question about your document"):
-        # Add user message to chat
-        user_message = HumanMessage(content=prompt)
-        st.session_state.messages.append(user_message)
+                        # Prepare context
+                        context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
+                        # Initialize LLM
+                        llm = ChatOllama(
+                            model="llama3.2:latest", #granite4:micro
+                            temperature=0.7
+                        )
 
-        # Retrieve relevant documents
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    # Retrieve relevant context
-                    retriever = st.session_state.vector_store.as_retriever(
-                        search_type="similarity",
-                        search_kwargs={"k": 4}
-                    )
-                    relevant_docs = retriever.invoke(prompt)
+                        # Create prompt template
+                        prompt_template = ChatPromptTemplate.from_messages([
+                            ("system", """You are a helpful assistant that answers questions based on the provided context.
+                            Use the following context to answer the user's question. If you cannot find the answer in the context, say so.
 
-                    # Prepare context
-                    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+                            Context:
+                            {context}"""),
+                            MessagesPlaceholder(variable_name="chat_history"),
+                            ("human", "{question}")
+                        ])
 
-                    # Initialize LLM
-                    llm = ChatOllama(
-                        model="granite4:micro",
-                        temperature=0.7
-                    )
+                        # Prepare chat history (last 5 messages for context)
+                        chat_history = st.session_state.messages[-6:-1] if len(st.session_state.messages) > 1 else []
 
-                    # Create prompt template
-                    prompt_template = ChatPromptTemplate.from_messages([
-                        ("system", """You are a helpful assistant that answers questions based on the provided context.
-Use the following context to answer the user's question. If you cannot find the answer in the context, say so.
+                        # Generate response
+                        chain = prompt_template | llm
+                        response = chain.invoke({
+                            "context": context,
+                            "chat_history": chat_history,
+                            "question": prompt
+                        })
 
-Context:
-{context}"""),
-                        MessagesPlaceholder(variable_name="chat_history"),
-                        ("human", "{question}")
-                    ])
+                        # Display response
+                        st.markdown(response.content)
 
-                    # Prepare chat history (last 5 messages for context)
-                    chat_history = st.session_state.messages[-6:-1] if len(st.session_state.messages) > 1 else []
+                        # Add AI response to chat history
+                        ai_message = AIMessage(content=response.content)
+                        st.session_state.messages.append(ai_message)
 
-                    # Generate response
-                    chain = prompt_template | llm
-                    response = chain.invoke({
-                        "context": context,
-                        "chat_history": chat_history,
-                        "question": prompt
-                    })
+                        # Show sources in expander
+                        with st.expander("📚 View Sources"):
+                            for i, doc in enumerate(relevant_docs, 1):
+                                st.markdown(f"**Source {i}:**")
+                                st.markdown(doc.page_content[:500] + "..." if len(doc.page_content) > 500 else doc.page_content)
+                                if doc.metadata:
+                                    st.caption(f"Metadata: {doc.metadata}")
+                                st.markdown("---")
 
-                    # Display response
-                    st.markdown(response.content)
+                    except Exception as e:
+                        st.error(f"Error generating response: {str(e)}")
+                        st.info("Make sure Ollama is running with the granite4:micro model")
 
-                    # Add AI response to chat history
-                    ai_message = AIMessage(content=response.content)
-                    st.session_state.messages.append(ai_message)
-
-                    # Show sources in expander
-                    with st.expander("📚 View Sources"):
-                        for i, doc in enumerate(relevant_docs, 1):
-                            st.markdown(f"**Source {i}:**")
-                            st.markdown(doc.page_content[:500] + "..." if len(doc.page_content) > 500 else doc.page_content)
-                            if doc.metadata:
-                                st.caption(f"Metadata: {doc.metadata}")
-                            st.markdown("---")
-
-                except Exception as e:
-                    st.error(f"Error generating response: {str(e)}")
-                    st.info("Make sure Ollama is running with the granite4:micro model")
+with tab2:
+    #st.header("📄 Document markdown-er")
+    #uploaded_doc = st.file_uploader("Choose a PDF file", type=['pdf'])
+    #print(uploaded_doc)
+    converter = DocumentConverter()
+    doc = converter.convert(uploaded_file.name).document
+    st.write(doc)
 
 # Footer
 st.markdown("---")
